@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - kafka-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - kafka-network
+
+  traffic-generator:
+    build:
+      context: .
+      dockerfile: services/traffic_generator/Dockerfile
+    depends_on:
+      - kafka
+    volumes:
+      - ./data:/app/data
+    environment:
+      KAFKA_BROKER: kafka:29092
+    networks:
+      - kafka-network
+    restart: "no"
+
+  llm-consumer:
+    build:
+      context: .
+      dockerfile: services/llm_consumer/Dockerfile
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+    restart: always
+
+  rate-limit-retry:
+    build:
+      context: .
+      dockerfile: services/rate_limit_retry/Dockerfile
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+    restart: always
+
+  overload-retry:
+    build:
+      context: .
+      dockerfile: services/overload_retry/Dockerfile
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+    restart: always
+
+  flink-score-processor:
+    build:
+      context: .
+      dockerfile: flink/Dockerfile
+    depends_on:
+      - kafka
+    volumes:
+      - ./data:/app/data
+    networks:
+      - kafka-network
+    restart: always
+
+  storage-consumer:
+    build:
+      context: .
+      dockerfile: services/storage_consumer/Dockerfile
+    depends_on:
+      - kafka
+    volumes:
+      - ./data:/app/data
+    networks:
+      - kafka-network
+    restart: always
+
+networks:
+  kafka-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
+

@@ -1,0 +1,97 @@
+GUÍA RÁPIDA DE USO
+==================
+
+PASO 1: Preparar el entorno
+----------------------------
+1. Asegúrate de tener Docker y Docker Compose instalados
+2. Coloca tu archivo test.csv en el directorio data/
+3. Edita utils.py y configura tu API key de Gemini
+
+PASO 2: Iniciar el sistema
+--------------------------
+Ejecuta en una terminal:
+```bash
+docker-compose up --build
+```
+
+Espera a que todos los servicios estén corriendo (esto puede tardar 1-2 minutos).
+
+PASO 3: Generar tráfico
+-----------------------
+En otra terminal, ejecuta:
+```bash
+docker-compose run --rm traffic-generator
+```
+
+Esto generará 20 preguntas y las enviará a Kafka.
+
+PASO 4: Monitorear
+-------------------
+Puedes ver los logs de todos los servicios con:
+```bash
+docker-compose logs -f
+```
+
+O ver logs de un servicio específico:
+```bash
+docker-compose logs -f llm-consumer
+docker-compose logs -f flink-score-processor
+docker-compose logs -f storage-consumer
+```
+
+PASO 5: Verificar resultados
+-----------------------------
+Ejecuta el script de prueba:
+```bash
+python test_system.py
+```
+
+O consulta directamente la base de datos:
+```bash
+docker-compose exec storage-consumer python -c "
+import sqlite3
+import pandas as pd
+conn = sqlite3.connect('/app/data/queries.db')
+df = pd.read_sql('SELECT * FROM queries', conn)
+print(df)
+conn.close()
+"
+```
+
+PASO 6: Detener el sistema
+---------------------------
+Para detener todos los servicios:
+```bash
+docker-compose down
+```
+
+Para detener y eliminar volúmenes (incluyendo la BD):
+```bash
+docker-compose down -v
+```
+
+NOTAS IMPORTANTES
+-----------------
+- El sistema necesita tiempo para inicializar Kafka (30-60 segundos)
+- Los servicios se reinician automáticamente si fallan
+- El generador de tráfico solo se ejecuta una vez (restart: "no")
+- Los otros servicios están siempre activos esperando mensajes
+
+SOLUCIÓN DE PROBLEMAS
+----------------------
+Si Kafka no responde:
+```bash
+docker-compose restart kafka
+```
+
+Si un servicio no inicia:
+```bash
+docker-compose logs servicio-nombre
+docker-compose restart servicio-nombre
+```
+
+Para ver el estado de todos los servicios:
+```bash
+docker-compose ps
+```
+
